@@ -1,4 +1,6 @@
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions.hour
 
 object chicagoCrime {
 
@@ -8,12 +10,46 @@ object chicagoCrime {
       .master("spark://concord.cs.colostate.edu:46010")
       .getOrCreate()
 
+    val customSchema = StructType(Array(
+      StructField("id1", IntegerType, true),
+      StructField("ID", IntegerType, true),
+      StructField("Case Number", StringType, true),
+      StructField("Date", TimestampType, true),
+      StructField("Block", StringType, true),
+      StructField("IUCR", StringType, true),
+      StructField("Primary Type", StringType, true),
+      StructField("Description", StringType, true),
+      StructField("Location Description", StringType, true),
+      StructField("Arrest", StringType, true),
+      StructField("Domestic", StringType, true),
+      StructField("Beat", IntegerType, true),
+      StructField("District", DoubleType, true),
+      StructField("Ward", DoubleType, true),
+      StructField("Community Area", DoubleType, true),
+      StructField("FBI Code", StringType, true),
+      StructField("X Coordinate", DoubleType, true),
+      StructField("Y Coordinate", DoubleType, true),
+      StructField("Year", IntegerType, true),
+      StructField("Updated On", StringType, true),
+      StructField("Latitude", DoubleType, true),
+      StructField("Longitude", DoubleType, true),
+      StructField("Location", StringType, true)
+    ))
+
     // Read in CSV file
     val crime = spark.read.format("csv")
       .option("header", "true")
-      .option("inferSchema", "true")
+      .option("timestampFormat","MM/dd/yyyy hh:mm:ss a")
+      .schema(customSchema)
       .load(args(0))
       .persist()
+
+
+    // Test extraction of hour
+    val hourIncluded = crime.withColumn("HOD", hour(crime("Date")))
+
+    println(hourIncluded.show(25))
+
 
     val compactCrimes = crime.select("Date", "Latitude", "Longitude")
 
