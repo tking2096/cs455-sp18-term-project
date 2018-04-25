@@ -90,11 +90,11 @@ object chicagoCrime {
     val indexedIUCR = indexerIUCR.fit(set).transform(set)
 
     val indexerBeats = new StringIndexer()
-      .setInputCol("IUCR")
+      .setInputCol("Beat")
       .setOutputCol("indexedBeat")
     indexerBeats.setHandleInvalid("skip")
 
-    val indexedBeats = indexerBeats.fit(set).transform(set)
+    val indexedBeats = indexerBeats.fit(indexedIUCR).transform(indexedIUCR)
 
 //    println(indexed.show(25))
 
