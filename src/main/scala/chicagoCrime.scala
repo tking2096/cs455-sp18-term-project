@@ -1,6 +1,6 @@
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.hour
+import org.apache.spark.sql.functions.{hour, dayofmonth, month}
 
 object chicagoCrime {
 
@@ -46,18 +46,23 @@ object chicagoCrime {
 
 
     // Test extraction of hour
-    val hourIncluded = crime.withColumn("HOD", hour(crime("Date")))
+    val additions = crime
+      .withColumn("hourOfDay", hour(crime("Date")))
+      .withColumn("day", dayofmonth(crime("Date")))
+      .withColumn("month", month(crime("Date")))
 
-    println(hourIncluded.show(25))
+    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "Beat")
+
+    println(set.show(25))
 
 
-    val compactCrimes = crime.select("Date", "Latitude", "Longitude")
-
-    compactCrimes.coalesce(1)
-      .write.format("csv")
-      .option("header", "true")
-      .save("hdfs://concord:30101/cs455Project/compacted/01_04_CrimesDataSet")
-
+//    val compactCrimes = crime.select("Date", "Latitude", "Longitude")
+//
+//    compactCrimes.coalesce(1)
+//      .write.format("csv")
+//      .option("header", "true")
+//      .save("hdfs://concord:30101/cs455Project/compacted/01_04_CrimesDataSet")
+//
 
 
   }
