@@ -1,4 +1,5 @@
-import org.apache.spark.rdd.RDD
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions.{dayofmonth, hour, map, month, udf}
@@ -62,35 +63,38 @@ object chicagoCrime {
       case Row(actualBeat: Int, newBeat: Int) => (actualBeat, newBeat)
     }.collectAsMap()
 
-
+    // Use a user defined function to replace given beat numbers with ones that we provide
     def func: (Int => Int) = {b => beatRdd.get(b).get}
-
     val correctBeats = udf(func)
 
-//    val withCorrBeat = crime.withColumn("adjBeats", correctBeats(crime("Beat")))
 
-//    println(withCorrBeat.show(25))
-
-
-    // Test extraction of hour
     val additions = crime
       .withColumn("hourOfDay", hour(crime("Date")))
       .withColumn("day", dayofmonth(crime("Date")))
       .withColumn("month", month(crime("Date")))
       .withColumn("adjBeats", correctBeats(crime("Beat")))
 
-    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "Beat", "adjBeats")
+    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "adjBeats")
 
     println(set.show(25))
 
+    val indexer = new StringIndexer()
+      .setInputCol("IUCR")
+      .setOutputCol("indexIUCR")
 
-//    val compactCrimes = crime.select("Date", "Latitude", "Longitude")
-//
-//    compactCrimes.coalesce(1)
-//      .write.format("csv")
-//      .option("header", "true")
-//      .save("hdfs://concord:30101/cs455Project/compacted/01_04_CrimesDataSet")
-//
+    val indexed = indexer.fit(set).transform(set)
+
+    println(indexed.show(25))
+
+    val assembler = new VectorAssembler()
+      .setInputCols(Array("year","month","day","hourOfDay","indexIUCR"))
+      .setOutputCol("features")
+
+    val output = assembler.transform(indexed)
+
+    println(output.show(25))
+
+
 
 
   }
