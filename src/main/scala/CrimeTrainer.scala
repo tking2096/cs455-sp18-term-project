@@ -7,7 +7,7 @@ import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions.{dayofmonth, hour, map, month, udf}
 
-object CrimePredictor {
+object CrimeTrainer {
 
   def main(args: Array[String]): Unit = {
 
@@ -58,7 +58,7 @@ object CrimePredictor {
       .option("header", "true")
       .option("timestampFormat","MM/dd/yyyy hh:mm:ss a")
       .schema(customSchema)
-      .load("hdfs://concord:30101/cs455Project/data/Chicago_Crimes_2012_to_2017.csv")
+      .load(args(0))
       .persist()
 
 
@@ -120,7 +120,7 @@ object CrimePredictor {
       .setFeaturesCol("indexedFeatures")
       .setBlockSize(128)
       .setSeed(System.currentTimeMillis())
-      .setMaxIter(50)
+      .setMaxIter(1000)
 
     val labelConverter = new IndexToString()
       .setInputCol("prediction")
@@ -134,9 +134,9 @@ object CrimePredictor {
     val model = pipeline.fit(trainingData)
 
     val predictions = model.transform(testData)
-    predictions.show(5)
+    predictions.show(30)
 
-    //model.save("hdfs://concord:30101/cs455Project/model")
+    model.save(args(1))
 
 
     val evaluator = new MulticlassClassificationEvaluator()
