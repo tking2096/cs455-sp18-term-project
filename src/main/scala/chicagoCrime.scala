@@ -14,10 +14,10 @@ object chicagoCrime {
       .master("spark://concord.cs.colostate.edu:46010")
       .getOrCreate()
 
-    val beatSchema = StructType(Array(
-      StructField("actualBeat", IntegerType, true),
-      StructField("newBeat", IntegerType, true)
-    ))
+//    val beatSchema = StructType(Array(
+//      StructField("actualBeat", IntegerType, true),
+//      StructField("newBeat", IntegerType, true)
+//    ))
 
     val customSchema = StructType(Array(
       StructField("id1", IntegerType, true),
@@ -31,7 +31,7 @@ object chicagoCrime {
       StructField("Location Description", StringType, true),
       StructField("Arrest", StringType, true),
       StructField("Domestic", StringType, true),
-      StructField("Beat", IntegerType, true),
+      StructField("Beat", DoubleType, true),
       StructField("District", DoubleType, true),
       StructField("Ward", DoubleType, true),
       StructField("Community Area", DoubleType, true),
@@ -45,11 +45,11 @@ object chicagoCrime {
       StructField("Location", StringType, true)
     ))
 
-    val beatData = spark.read.format("csv")
-      .option("header", "false")
-      .schema(beatSchema)
-      .load("hdfs://concord:30101/cs455Project/beats/uniqueBeatsPair.csv")
-      .persist()
+//    val beatData = spark.read.format("csv")
+//      .option("header", "false")
+//      .schema(beatSchema)
+//      .load("hdfs://concord:30101/cs455Project/beats/uniqueBeatsPair.csv")
+//      .persist()
 
 
     // Read in CSV file
@@ -61,41 +61,50 @@ object chicagoCrime {
       .persist()
 
 
-    val beatRdd = beatData.rdd.map{
-      case Row(actualBeat: Int, newBeat: Int) => (actualBeat, newBeat)
-    }.collectAsMap()
-
-    // Use a user defined function to replace given beat numbers with ones that we provide
-    def func: (Int => Double) = {b => beatRdd.get(b).get.toDouble}
-    val correctBeats = udf(func)
+//    val beatRdd = beatData.rdd.map{
+//      case Row(actualBeat: Int, newBeat: Int) => (actualBeat, newBeat)
+//    }.collectAsMap()
+//
+//    // Use a user defined function to replace given beat numbers with ones that we provide
+//    def func: (Int => Double) = {b => beatRdd.get(b).get.toDouble}
+//    val correctBeats = udf(func)
 
 
     val additions = crime
       .withColumn("hourOfDay", hour(crime("Date")))
       .withColumn("day", dayofmonth(crime("Date")))
       .withColumn("month", month(crime("Date")))
-      .withColumn("adjBeats", correctBeats(crime("Beat")))
+//      .withColumn("adjBeats", correctBeats(crime("Beat")))
 
-    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "adjBeats")
+//    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "adjBeats")
+
+    val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "Beat")
 
 //    println(set.show(25))
 
-    val indexer = new StringIndexer()
+    val indexerIUCR = new StringIndexer()
       .setInputCol("IUCR")
-      .setOutputCol("indexIUCR")
-    indexer.setHandleInvalid("skip")
+      .setOutputCol("indexedIUCR")
+    indexerIUCR.setHandleInvalid("skip")
 
-    val indexed = indexer.fit(set).transform(set)
+    val indexedIUCR = indexerIUCR.fit(set).transform(set)
+
+    val indexerBeats = new StringIndexer()
+      .setInputCol("IUCR")
+      .setOutputCol("indexedBeat")
+    indexerBeats.setHandleInvalid("skip")
+
+    val indexedBeats = indexerBeats.fit(set).transform(set)
 
 //    println(indexed.show(25))
 
     val assembler = new VectorAssembler()
-      .setInputCols(Array("year","month","day","hourOfDay","indexIUCR"))
+      .setInputCols(Array("year","month","day","hourOfDay","indexedIUCR"))
       .setOutputCol("features")
 
-    val output = assembler.transform(indexed)
+    val output = assembler.transform(indexedBeats)
 
-    println(output.show(25))
+//    println(output.show(25))
 
     // Split the data into train and test
 
@@ -114,21 +123,27 @@ object chicagoCrime {
     val trainer = new MultilayerPerceptronClassifier()
       .setLayers(layers)
       .setFeaturesCol("features")
-      .setLabelCol("adjBeats")
+      .setLabelCol("indexedBeat")
       .setBlockSize(128)
       .setSeed(1234L)
-      .setMaxIter(100)
+      .setMaxIter(50)
 
     // train the model
     val model = trainer.fit(train)
 
-    // compute accuracy on the test set
-    val result = model.transform(test)
-    val predictionAndLabels = result.select("prediction", "label")
-    val evaluator = new MulticlassClassificationEvaluator()
-      .setMetricName("accuracy")
+    model.save("hdfs://concord:30101/cs455Project/model")
 
-    println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
+    // compute accuracy on the test set
+    val result = model.transform(test).show(25)
+
+
+
+
+//    val predictionAndLabels = result.select("prediction")
+//    val evaluator = new MulticlassClassificationEvaluator()
+//      .setMetricName("accuracy")
+//
+//    println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 
 
   }
