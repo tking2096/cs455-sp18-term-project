@@ -64,7 +64,7 @@ object chicagoCrime {
     }.collectAsMap()
 
     // Use a user defined function to replace given beat numbers with ones that we provide
-    def func: (Int => Int) = {b => beatRdd.get(b).get}
+    def func: (Int => Double) = {b => beatRdd.get(b).get.toDouble}
     val correctBeats = udf(func)
 
 
