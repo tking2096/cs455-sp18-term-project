@@ -94,7 +94,7 @@ object CrimePredictor {
       .setInputCols(Array("year","month","day","hourOfDay","indexedIUCR"))
       .setOutputCol("features")
 
-    val features = assembler.transform(set)
+    val features = assembler.transform(indexedIUCR)
     features.show(5)
 
     val labelIndexer = new StringIndexer().setInputCol("Beat").setOutputCol("indexedBeat").fit(features)
