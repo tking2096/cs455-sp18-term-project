@@ -1,3 +1,5 @@
+import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.sql.{Row, SparkSession}
@@ -46,7 +48,7 @@ object chicagoCrime {
     val beatData = spark.read.format("csv")
       .option("header", "false")
       .schema(beatSchema)
-      .load(args(1))
+      .load("hdfs://concord:30101/cs455Project/beats/uniqueBeatsPair.csv")
       .persist()
 
 
@@ -55,7 +57,7 @@ object chicagoCrime {
       .option("header", "true")
       .option("timestampFormat","MM/dd/yyyy hh:mm:ss a")
       .schema(customSchema)
-      .load(args(0))
+      .load("hdfs://concord:30101/cs455Project/data/*.csv")
       .persist()
 
 
@@ -76,15 +78,16 @@ object chicagoCrime {
 
     val set = additions.select("year", "month", "day", "hourOfDay", "IUCR", "adjBeats")
 
-    println(set.show(25))
+//    println(set.show(25))
 
     val indexer = new StringIndexer()
       .setInputCol("IUCR")
       .setOutputCol("indexIUCR")
+    indexer.setHandleInvalid("skip")
 
     val indexed = indexer.fit(set).transform(set)
 
-    println(indexed.show(25))
+//    println(indexed.show(25))
 
     val assembler = new VectorAssembler()
       .setInputCols(Array("year","month","day","hourOfDay","indexIUCR"))
@@ -94,7 +97,38 @@ object chicagoCrime {
 
     println(output.show(25))
 
+    // Split the data into train and test
 
+
+
+    val splits = output.randomSplit(Array(0.6, 0.4), seed = 1234L)
+    val train = splits(0)
+    val test = splits(1)
+
+    // specify layers for the neural network:
+    // input layer of size 4 (features), two intermediate of size 5 and 4
+    // and output of size 3 (classes)
+    val layers = Array[Int](5, 100, 200, 305)
+
+    // create the trainer and set its parameters
+    val trainer = new MultilayerPerceptronClassifier()
+      .setLayers(layers)
+      .setFeaturesCol("features")
+      .setLabelCol("adjBeats")
+      .setBlockSize(128)
+      .setSeed(1234L)
+      .setMaxIter(100)
+
+    // train the model
+    val model = trainer.fit(train)
+
+    // compute accuracy on the test set
+    val result = model.transform(test)
+    val predictionAndLabels = result.select("prediction", "label")
+    val evaluator = new MulticlassClassificationEvaluator()
+      .setMetricName("accuracy")
+
+    println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 
 
   }
