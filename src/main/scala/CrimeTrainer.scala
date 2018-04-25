@@ -2,10 +2,9 @@ import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature.{IndexToString, StringIndexer, VectorAssembler, VectorIndexer}
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{dayofmonth, hour, month}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{dayofmonth, hour, map, month, udf}
 
 object CrimeTrainer {
 
@@ -120,7 +119,7 @@ object CrimeTrainer {
       .setFeaturesCol("indexedFeatures")
       .setBlockSize(128)
       .setSeed(System.currentTimeMillis())
-      .setMaxIter(1000)
+      .setMaxIter(1500)
 
     val labelConverter = new IndexToString()
       .setInputCol("prediction")
